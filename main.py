@@ -1,37 +1,38 @@
 import sys
 import traceback
-import mariadb
+from memsql.common import database
 
 # main is called at the bottom
 def main():
 
   # TODO: pull from config
-  host = 'localhost'
-  port = 3306
-  user = 'root'
-  password = ''
-  database = 'acme'
+  HOST = 'localhost'
+  PORT = 3306
+  USER = 'root'
+  PASSWORD = 'password_here'
+  DATABASE = 'acme'
 
-  connection = mariadb.connect(user=user, password=password, database=database, host=host, port=port)
-  cursor = connection.cursor()
+  conn = database.connect(host=HOST, port=PORT, user=USER, password=PASSWORD, database=DATABASE)
 
   try:
-    
-    id = create(cursor, "Inserted row")
+
+    conn.ping()
+
+    id = create(conn, "Inserted row")
     print("Inserted row {0}".format(id))
 
-    row = read_one(cursor, id)
+    row = read_one(conn, id)
     print(row, sep =',')
 
-    update(cursor, id, "Updated row")
+    update(conn, id, "Updated row")
     print("Updated row {0}".format(id))
 
-    rows = read_all(cursor)
+    rows = read_all(conn)
     print("All rows:")
     for row in rows:
       print(row, sep ='\t')
 
-    delete(cursor, id)
+    delete(conn, id)
     print("Deleted row {0}".format(id))
 
   except Exception as e:
@@ -39,39 +40,32 @@ def main():
     print(e)
     traceback.print_exc(file =sys.stdout)
 
-  cursor.close()
-  connection.close()
+  finally:
+    conn.close()
 
 
-def create(cursor, content):
-  sql = "INSERT INTO messages (content) VALUES (?)"
-  data = (content,)
-  cursor.execute(sql, data)
-  id = cursor.lastrowid
+def create(conn, content):
+  sql = "INSERT INTO messages (content) VALUES (%s)"
+  id = conn.execute_lastrowid(sql, content)
   return id
 
-def read_one(cursor, id):
-  sql = "SELECT id, content, createdate FROM messages WHERE id = ?"
-  data = (id,)
-  cursor.execute(sql, data)
-  row = cursor.fetchone()
+def read_one(conn, id):
+  sql = "SELECT id, content, createdate FROM messages WHERE id = %s"
+  row = conn.get(sql, id)
   return row
 
-def read_all(cursor):
+def read_all(conn):
   sql = "SELECT * FROM messages ORDER BY id"
-  cursor.execute(sql)
-  rows = cursor.fetchall()
+  rows = conn.query(sql)
   return rows
 
-def update(cursor, id, content):
-  sql = "UPDATE messages SET content =? WHERE id =?"
-  data = (content, id)
-  cursor.execute(sql, data)
+def update(conn, id, content):
+  sql = "UPDATE messages SET content = %s WHERE id = %s"
+  conn.query(sql, content, id)
 
-def delete(cursor, id):
-  sql = "DELETE FROM messages WHERE id =?"
-  data = (id, )
-  cursor.execute(sql, data)
+def delete(conn, id):
+  sql = "DELETE FROM messages WHERE id = %s"
+  conn.query(sql, id)
 
 if __name__ == '__main__':
   main()
